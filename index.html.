@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mushotoku II</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Helvetica Neue', Arial, sans-serif;
+    }
+
+    body, html {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #111;
+      color: white;
+    }
+
+    #pantalla-inicio, #pantalla-fin {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      width: 100vw;
+      background-color: #000;
+    }
+
+    #contenedor-preliminar {
+      width: 85%;
+      height: 80%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    #img-preliminar {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+    }
+
+    button {
+      margin-top: 15px;
+      padding: 12px 28px;
+      font-size: 1.1rem;
+      font-weight: bold;
+      cursor: pointer;
+      border: none;
+      border-radius: 6px;
+      background-color: #ffffff;
+      color: #111;
+      transition: background-color 0.3s;
+    }
+
+    #escenario {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      transition: background-color 1s ease;
+    }
+
+    #timer-bar {
+      position: absolute;
+      top: 0;
+      left: 0;
+      height: 12px;
+      background-color: rgba(255, 255, 255, 0.9);
+      width: 100%;
+    }
+
+    #info-overlay {
+      position: absolute;
+      bottom: 15px;
+      right: 20px;
+      font-size: 1.1rem;
+      font-weight: bold;
+      background: rgba(0,0,0,0.6);
+      padding: 6px 14px;
+      border-radius: 20px;
+      display: flex;
+      gap: 15px;
+    }
+
+    #contenedor-partitura {
+      width: 85%;
+      height: 80%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    #partitura-img {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+    }
+
+    .oculto {
+      display: none !important;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="pantalla-inicio">
+    <div id="contenedor-preliminar">
+      <img id="img-preliminar" src="" alt="Cargando carátula...">
+    </div>
+    <button id="btn-accion">SIGUIENTE</button>
+  </div>
+
+  <div id="escenario" class="oculto">
+    <div id="timer-bar"></div>
+    <div id="info-overlay">
+      <span id="label-modulo">Módulo --</span>
+      <span id="label-tiempo">00s</span>
+    </div>
+    
+    <div id="contenedor-partitura">
+      <img id="partitura-img" src="" alt="Partitura del módulo">
+    </div>
+  </div>
+
+  <div id="pantalla-fin" class="oculto">
+    <h1>FIN</h1>
+  </div>
+
+  <script>
+    const BASE_URL = "./";
+
+    const PRELIMINARES = ["A1OK.jpg", "A2OK.jpg", "A3OK.jpg"];
+    let indicePreliminar = 0;
+
+    const BLOQUES_LETRAS = [
+      "1.jpg", "1a.jpg", "1b.jpg", "1c.jpg", "1d.jpg", "1e.jpg",
+      "2 .jpg", "2a.jpg", "2b.jpg", "2c.jpg", "2d.jpg", "2e.jpg",
+      "3.jpg", "3a.jpg", "3b.jpg", "3c.jpg", "3d.jpg", "3e.jpg",
+      "4.jpg", "4a.jpg", "4b.jpg", "4c.jpg", "4d.jpg", "4e.jpg",
+      "5.jpg", "5a.jpg", "5b.jpg", "5c.jpg", "5d.jpg", "5e.jpg",
+      "6.jpg", "6a.jpg", "6b.jpg", "6c.jpg", "6d.jpg", "6e.jpg",
+      "7.jpg", "7a.jpg", "7b.jpg", "7c.jpg", "7d.jpg", "7e.jpg"
+    ];
+
+    const BLOQUES_ESPECIALES = [
+      "8.jpg", "9.jpg", "10.jpg", "11.jpg", "12.jpg", "13.jpg", "14.jpg", "15.jpg"
+    ];
+
+    const BLOQUES_TOTALES = [...BLOQUES_LETRAS, ...BLOQUES_ESPECIALES];
+
+    const MAPA_COLORES = {
+      "a": "#FBC02D",
+      "b": "#2E7D32",
+      "c": "#0288D1",
+      "d": "#D32F2F",
+      "e": "#7B1FA2"
+    };
+    const COLOR_DEFECTO = "#212121";
+
+    const TIEMPO_MIN_OBRA = 720;
+    const TIEMPO_MAX_OBRA = 960;
+
+    let tiempoTotalObra = 0;
+    let tiempoTranscurrido = 0;
+    let historialModulos = [];
+    let contadorSinEspecial = 0;
+    let intervalId = null;
+
+    const pantallaInicio = document.getElementById("pantalla-inicio");
+    const pantallaFin = document.getElementById("pantalla-fin");
+    const escenario = document.getElementById("escenario");
+    const btnAccion = document.getElementById("btn-accion");
+    const imgPreliminar = document.getElementById("img-preliminar");
+    const imgPartitura = document.getElementById("partitura-img");
+    const labelModulo = document.getElementById("label-modulo");
+    const labelTiempo = document.getElementById("label-tiempo");
+    const timerBar = document.getElementById("timer-bar");
+
+    function cargarPreliminar() {
+      if (imgPreliminar) {
+        imgPreliminar.src = BASE_URL + PRELIMINARES[indicePreliminar];
+      }
+    }
+    cargarPreliminar();
+
+    btnAccion.addEventListener("click", () => {
+      if (indicePreliminar < PRELIMINARES.length - 1) {
+        indicePreliminar++;
+        cargarPreliminar();
+        
+        if (indicePreliminar === PRELIMINARES.length - 1) {
+          btnAccion.textContent = "INICIAR OBRA";
+          btnAccion.style.backgroundColor = "#2e7d32";
+          btnAccion.style.color = "#fff";
+        }
+      } else {
+        iniciarObraAleatoria();
+      }
+    });
+
+    function iniciarObraAleatoria() {
+      tiempoTotalObra = Math.floor(Math.random() * (TIEMPO_MAX_OBRA - TIEMPO_MIN_OBRA + 1)) + TIEMPO_MIN_OBRA;
+      tiempoTranscurrido = 0;
+      historialModulos = [];
+      contadorSinEspecial = 0;
+
+      pantallaInicio.classList.add("oculto");
+      escenario.classList.remove("oculto");
+
+      lanzarSiguienteBloque();
+    }
+
+    function lanzarSiguienteBloque() {
+      if (tiempoTranscurrido >= tiempoTotalObra) {
+        finalizarObra();
+        return;
+      }
+
+      let bloqueElegido;
+
+      if (contadorSinEspecial >= 7) {
+        do {
+          bloqueElegido = BLOQUES_ESPECIALES[Math.floor(Math.random() * BLOQUES_ESPECIALES.length)];
+        } while (historialModulos.slice(-2).includes(bloqueElegido));
+      } else {
+        do {
+          bloqueElegido = BLOQUES_TOTALES[Math.floor(Math.random() * BLOQUES_TOTALES.length)];
+        } while (historialModulos.slice(-2).includes(bloqueElegido));
+      }
+
+      if (BLOQUES_ESPECIALES.includes(bloqueElegido)) {
+        contadorSinEspecial = 0;
+      } else {
+        contadorSinEspecial++;
+      }
+
+      historialModulos.push(bloqueElegido);
+
+      let duracionBloque = Math.floor(Math.random() * 51) + 10;
+      if (tiempoTranscurrido + duracionBloque > tiempoTotalObra) {
+        duracionBloque = tiempoTotalObra - tiempoTranscurrido;
+      }
+
+      const nombreBase = bloqueElegido.replace(".jpg", "").trim();
+      const letraFinal = nombreBase.slice(-1).toLowerCase();
+      
+      const colorBg = MAPA_COLORES[letraFinal] || COLOR_DEFECTO;
+      escenario.style.backgroundColor = colorBg;
+
+      labelModulo.textContent = `Módulo ${nombreBase}`;
+      imgPartitura.src = BASE_URL + bloqueElegido;
+
+      ejecutarRelojBloque(duracionBloque);
+    }
+
+    function ejecutarRelojBloque(duracion) {
+      let tiempoRestante = duracion;
+      labelTiempo.textContent = `${tiempoRestante}s`;
+      timerBar.style.width = "100%";
+
+      const tiempoInicio = Date.now();
+
+      intervalId = setInterval(() => {
+        const transcurridoSegmento = Math.floor((Date.now() - tiempoInicio) / 1000);
+        tiempoRestante = duracion - transcurridoSegmento;
+
+        if (tiempoRestante <= 0) {
+          clearInterval(intervalId);
+          tiempoTranscurrido += duracion;
+          lanzarSiguienteBloque();
+        } else {
+          labelTiempo.textContent = `${tiempoRestante}s`;
+          const porcentaje = (tiempoRestante / duracion) * 100;
+          timerBar.style.width = `${porcentaje}%`;
+        }
+      }, 200);
+    }
+
+    function finalizarObra() {
+      clearInterval(intervalId);
+      escenario.classList.add("oculto");
+      pantallaFin.classList.remove("oculto");
+    }
+  </script>
+</body>
+</html>
